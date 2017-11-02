@@ -25,7 +25,7 @@ paused = False
 pitch=pitch.pitch(stadiumParams.pitchLineLeft,stadiumParams.pitch_length,5)
 ball_pos=(pitch.pos[0]+ stadiumParams.pitch_length,pitch.pos[1]-stadiumParams.ball_height)
 
-ball_boundary=pygame.Rect(0,100,int(stadiumParams.pitch_length*1.5),300)
+ball_boundary=pygame.Rect(0,100,stadiumParams.pitch_length+pitch.pos[0],300)
 
 ball=ball.ball(ball_pos,10,(-40.0,-3), ball_boundary)
 stump=stump.stump(stadiumParams.stumpLineTop,3, stadiumParams.stumpLength)
@@ -37,29 +37,39 @@ objects=[pitch,stump,ball,bat]
 # data_dir = os.path.join(main_dir,'res')
 # ballHitSound=pygame.mixer.Sound(os.path.join(data_dir,'sounds','baseball_hit_006.wav'))
 score=stadiumParams.Score()
-lastBallStatusStr="last ball :"
+lastBallStatusStr="-"
+recentBallsQueue=stadiumParams.RecentBallsQueue()
 hitEventQueue=stadiumParams.HitEventQueue()
 
 
-def showLastBallStatus():
-	statusSurf=pygame.font.Font('freesansbold.ttf', 21).render(lastBallStatusStr,True,BLACK)
-	statusRect=statusSurf.get_rect()
-	statusRect.topleft=(30,450)
-	displaySurf.blit(statusSurf,statusRect)
+def drawText(text, pos, fontSize=21):
+	surf=pygame.font.Font('freesansbold.ttf', fontSize).render(text,True,BLACK)
+	rect=surf.get_rect()
+	rect.topleft=pos
+	displaySurf.blit(surf,rect)
 
-	scoreSurf=pygame.font.Font('freesansbold.ttf', 21).render(score.toStr(),True,BLACK)
-	scoreRect=scoreSurf.get_rect()
-	scoreRect.topleft=(500,40)
-	displaySurf.blit(scoreSurf,scoreRect)
+def showProgress():
+	drawText("Last Over : "+score.getLastOverScoreStr(),(30,10))
+	drawText("Recent : "+recentBallsQueue.toStr(),(30,40))
+	drawText("Last Ball : "+lastBallStatusStr,(30,70))
 
-def updateLastBallStatus(distance):
+	drawText("Score : "+score.toStr(),(500,10))
+	drawText("Run Rate : "+str(score.getRunRate()),(500,40))
+	drawText("Cur. Partnership : "+score.getCurrentPartnerShipStr(),(500,70))
+
+	for i in range(11):
+		text=score.battingScoreCard.getBatsmanScoreStrAt(i)
+		drawText(text,(650,100+i*18),18)
+
+def updateProgress(distance):
 	global lastBallStatusStr
 	distance=abs(distance)
 	cricEvent=''
 	if(distance<100):
 		if(hitEventQueue.getRecentHitEvent()&stadiumParams.HitEvent.HIT_STUMP>0):
 			cricEvent='W'
-		elif(hitEventQueue.getPastHitEvent()&stadiumParams.HitEvent.HIT_BAT>0):#recent hit event = hit_boundary
+		elif(hitEventQueue.getRecentHitEvent()&stadiumParams.HitEvent.HIT_BOUNDARY > 0 and\
+		 hitEventQueue.getPastHitEvent()&stadiumParams.HitEvent.HIT_BAT>0):
 			cricEvent='W'
 		else:
 			cricEvent='0'
@@ -74,15 +84,17 @@ def updateLastBallStatus(distance):
 	elif(distance>=500):
 		cricEvent='6'
 
-	lastBallStatusStr='last ball : '+cricEvent+' ('+str(round(distance,2))+'m)'
+	lastBallStatusStr=cricEvent+' ('+str(round(distance,2))+'m)'
 	# print(lastBallStatusStr)
 
 	if(cricEvent=='W'):
 		score.addWicket()
+		if(score.wickets==10):
+			global paused
+			paused=not paused
 	else:
 		score.addRuns(int(cricEvent))
-	score.addBall()
-
+	recentBallsQueue.push(cricEvent)
 
 
 running=True
@@ -97,10 +109,18 @@ while running:
 			if event.key == pygame.K_ESCAPE:
 				pygame.quit()
 				quit()
-			if event.key == pygame.K_k:
+			elif event.key == pygame.K_k:
 				ball.kill()
-			if event.key == pygame.K_SPACE:
+			elif event.key == pygame.K_SPACE:
 				paused=not paused
+
+			elif event.key == pygame.K_RIGHT:
+				bat.pos=(bat.pos[0]+5,bat.pos[1])
+				bat.end_pos=(bat.end_pos[0]+5,bat.end_pos[1])
+
+			elif event.key == pygame.K_LEFT:
+				bat.pos=(bat.pos[0]-5,bat.pos[1])
+				bat.end_pos=(bat.end_pos[0]-5,bat.end_pos[1])
 
 		if event.type == pygame.MOUSEBUTTONDOWN:
 			bat.startSwing()
@@ -119,14 +139,17 @@ while running:
 
 		if(hitEvent!=stadiumParams.HitEvent.NONE):
 			hitEventQueue.push(hitEvent)
-			if(hitEvent&stadiumParams.HitEvent.HIT_BAT > 0):
+			if(hitEvent&stadiumParams.HitEvent.HIT_LAZY > 0):
+				ball.kill()
+				updateProgress(0)
+			elif(hitEvent&stadiumParams.HitEvent.HIT_BAT > 0):
 				# paused=not paused
 				# ballHitSound.play()
 				bat.endSwing()
 			elif(hitEvent&stadiumParams.HitEvent.HIT_STUMP > 0):
 				ball.kill()
 				stump.startDance()
-				updateLastBallStatus(0)
+				updateProgress(0)
 
 			elif(hitEvent&stadiumParams.HitEvent.HIT_BOUNDARY > 0):
 				ball.kill()
@@ -136,7 +159,7 @@ while running:
 				t=(-u+d)/ball.gravity
 				distance=ball.vx*t+(ball.x-bat.pos[0])*(1/ball.meter2pixFactor)
 
-				updateLastBallStatus(distance)
+				updateProgress(distance)
 			
 		#draw
 		displaySurf.fill(WHITE)
@@ -146,7 +169,7 @@ while running:
 
 		pygame.draw.rect(displaySurf, BLACK, ball_boundary, 2)
 
-		showLastBallStatus()
+		showProgress()
 		#update display
 		pygame.display.update()
 

@@ -45,13 +45,14 @@ class ball(Object):
 			# before=self.vy
 			if(self.vx<0):
 				self.vx=self.vx*random.randint(8,20)/10
-				self.vy=-(self.vy*random.randint(3,8)/10)
+				self.vy=-(self.vy*random.randint(3,15)/10)
 			else:
 				self.vx=self.vx*0.9
 				self.vy=-(self.vy*0.7)
 			# print('pitched : ',self.vx,'|', before,'-->',self.vy)
 			if(abs(self.vx)<5 and abs(self.vy)<0.5):
-				self.kill()
+				hitEvent|=stadiumParams.HitEvent.HIT_LAZY
+				return hitEvent
 
 			hitEvent|=stadiumParams.HitEvent.HIT_PITCH
 
@@ -117,8 +118,8 @@ class ball(Object):
 		return False
 
 	def ifHitStump(self):
-		if(self.x-4.5<stadiumParams.stumpLineTop[0] and \
-			self.y>stadiumParams.stumpLineTop[1]):
+		if(abs(self.pos[0]-stadiumParams.stumpLineTop[0])<(self.radius+5) and \
+			(self.pos[1]+self.radius)>=stadiumParams.stumpLineTop[1]):
 			return True
 		return False
 
