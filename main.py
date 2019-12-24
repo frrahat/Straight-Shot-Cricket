@@ -6,7 +6,7 @@ import os
 import math
 pygame.init()
 
-FPS = 30
+FPS = 60
 display_width=800
 display_height=600
 
@@ -106,7 +106,9 @@ while running:
 			running=False
 
 		if event.type == pygame.KEYDOWN:
-			if event.key == pygame.K_ESCAPE:
+			if event.key == pygame.K_m:
+				bat.startSwing()
+			elif event.key == pygame.K_ESCAPE:
 				pygame.quit()
 				quit()
 			elif event.key == pygame.K_k:
